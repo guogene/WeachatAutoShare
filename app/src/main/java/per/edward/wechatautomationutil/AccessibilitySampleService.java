@@ -8,10 +8,12 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.widget.Toast;
 
 import java.util.List;
 
@@ -53,8 +55,7 @@ public class AccessibilitySampleService extends AccessibilityService {
                 break;
             case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED:
 
-                if (event.getClassName().equals("com.tencent.mm.ui.LauncherUI")) {//第一次启动app
-                    flag = false;
+                if (!flag && event.getClassName().equals("com.tencent.mm.ui.LauncherUI")) {//第一次启动app
                     jumpToCircleOfFriends();//进入朋友圈页面
                 }
 
@@ -102,9 +103,12 @@ public class AccessibilitySampleService extends AccessibilityService {
      * 发送完跳回主APP
      */
     private void jumpBackApp(){
-        Intent intent = new Intent();
-        intent.setClassName("per.edward.wechatautomationutil","per.edward.wechatautomationutil.MainActivity");
-        startActivity(intent);
+//        Intent intent = new Intent();
+//        intent.setClassName("per.edward.wechatautomationutil","MainActivity");
+//        startActivity(intent);
+        PackageManager packageManager = getBaseContext().getPackageManager();
+        Intent it = packageManager.getLaunchIntentForPackage("per.edward.wechatautomationutil");
+        startActivity(it);
     }
 
     /**
@@ -136,6 +140,7 @@ public class AccessibilitySampleService extends AccessibilityService {
         List<AccessibilityNodeInfo> list = accessibilityNodeInfo.findAccessibilityNodeInfosByText("发表");//微信6.6.6版本修改为发表
         if (performClickBtn(list)) {
             flag = true;//标记为已发送
+            Toast.makeText(getBaseContext(), "发表成功", Toast.LENGTH_LONG).show();
             jumpBackApp(); //跳回原APP
             return true;
         }
