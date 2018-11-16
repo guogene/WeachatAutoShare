@@ -4,9 +4,11 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.Toast;
@@ -15,6 +17,8 @@ import com.bumptech.glide.Glide;
 import java.util.ArrayList;
 
 import per.edward.wechatautomationutil.utils.Constant;
+import per.edward.wechatautomationutil.AccessibilitySampleService;
+import per.edward.wechatautomationutil.utils.LogUtil;
 
 /**
  * 注意事项
@@ -42,6 +46,7 @@ public class MainActivity extends AppCompatActivity {
 
         findViewById(R.id.open_accessibility_setting).setOnClickListener(clickListener);
         findViewById(R.id.btn_save).setOnClickListener(clickListener);
+        findViewById(R.id.btn_paues).setOnClickListener(clickListener);
         initImgs();
     }
 
@@ -89,6 +94,9 @@ public class MainActivity extends AppCompatActivity {
                 case R.id.btn_save:
                     saveData();
                     break;
+                case R.id.btn_paues:
+                    pauseSendStatus();
+                    break;
             }
         }
     };
@@ -112,6 +120,15 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
+    private void pauseSendStatus(){
+        SharedPreferences sharedPreferences = getSharedPreferences(Constant.WECHAT_STORAGE, Activity.MODE_MULTI_PROCESS);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putBoolean(Constant.STATUS, true);
+        if (editor.commit()){
+            Toast.makeText(getBaseContext(), "暂停自动发送", Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void saveData() {
         if (!checkParams()) {
             return;
@@ -125,6 +142,7 @@ public class MainActivity extends AppCompatActivity {
         editor.putString(Constant.CONTENT, edit.getText().toString());
         editor.putInt(Constant.INDEX, index);
         editor.putInt(Constant.COUNT, count);
+        editor.putBoolean(Constant.STATUS, false);
         if (editor.commit()) {
             Toast.makeText(getBaseContext(), "保存成功", Toast.LENGTH_LONG).show();
             openWeChatApplication();//打开微信应用
