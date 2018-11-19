@@ -1,24 +1,30 @@
 package per.edward.wechatautomationutil;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ImageView;
 import com.bumptech.glide.Glide;
+
+import java.io.IOException;
 import java.util.ArrayList;
 
+import per.edward.wechatautomationutil.datainitialize.MomentItemBean;
 import per.edward.wechatautomationutil.utils.Constant;
-import per.edward.wechatautomationutil.AccessibilitySampleService;
 import per.edward.wechatautomationutil.utils.LogUtil;
+import per.edward.wechatautomationutil.datainitialize.RequestUrlData;
+
 
 /**
  * 注意事项
@@ -28,8 +34,10 @@ import per.edward.wechatautomationutil.utils.LogUtil;
  * Created by Edward on 2018-03-15.
  */
 public class MainActivity extends AppCompatActivity {
-    EditText edit, editIndex, editCount;
-    private ArrayList<String> urls;
+    EditText edit, editIndex, editToken, editTag;
+    TextView msgCount, msgResidue;
+    private ArrayList<MomentItemBean> allMsg;
+    private String[] imgUrls;
     private ArrayList<Integer> ids;
 
     @Override
@@ -42,21 +50,94 @@ public class MainActivity extends AppCompatActivity {
     private void initView() {
         edit = findViewById(R.id.edit);
         editIndex = findViewById(R.id.edit_index);
-        editCount = findViewById(R.id.edit_count);
+        editToken = findViewById(R.id.edit_token);
+        editTag = findViewById(R.id.edit_tag);
 
         findViewById(R.id.open_accessibility_setting).setOnClickListener(clickListener);
-        findViewById(R.id.btn_save).setOnClickListener(clickListener);
+        findViewById(R.id.btn_send).setOnClickListener(clickListener);
         findViewById(R.id.btn_paues).setOnClickListener(clickListener);
-        initImgs();
+        findViewById(R.id.btn_reset).setOnClickListener(clickListener);
+        findViewById(R.id.btn_update).setOnClickListener(clickListener);
+        checkDataInit();
     }
 
-    /**
-     *  渲染当前朋友圈的图文
-     */
-    private void initImgs(){
+    View.OnClickListener clickListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            switch (v.getId()) {
+                case R.id.open_accessibility_setting:
+                    OpenAccessibilitySettingHelper.jumpToSettingPage(getBaseContext());
+                    break;
+                case R.id.btn_send:
+                    saveData();
+                    break;
+                case R.id.btn_paues:
+                    pauseSendStatus();
+                    break;
+                case R.id.btn_update:
+                    try {
+                        updateData();
+                        Toast.makeText(getBaseContext(), "更新数据成功", Toast.LENGTH_SHORT).show();
+                    } catch (IOException e) {
+                        Toast.makeText(getBaseContext(), "更新数据失败", Toast.LENGTH_SHORT).show();
+                        e.printStackTrace();
+                    }
+                    break;
+            }
+        }
+    };
 
-        edit.setText("【VALENTINO】p400\uD83D\uDCB0华伦天奴  顶级版本。17ssRockstud经典裸靴铆钉系列 ，明星同款。面料2种：黑胎牛黑荔枝纹。内里：印度羊皮，意大利特殊改色真皮底、35-40跟高3种:2公分，6公分，9公分。7033-0401，7032-0601，7041-0401");
+    public void updateData() throws IOException {
+        SharedPreferences sharedPreferences = getSharedPreferences(Constant.WECHAT_STORAGE, Activity.MODE_MULTI_PROCESS);  //创建储存读取
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.clear();  // 清空之前保存信息
+        String token = editToken.getText().toString();
+        String tag = editTag.getText().toString();
+        String[] tagList = tag.split(",");
 
+        editor.putString("token", token);
+        editor.putString("tag", tag);
+        editor.putString("index", "0");
+
+        for (int i = 0; i < tagList.length; i++){
+            String tagData = RequestUrlData.tagAllData(tagList[i], token);
+            editor.putString(tagList[i], tagData);
+        }
+        if(editor.commit()){
+            checkDataInit();
+            return;
+        }
+    }
+
+    @SuppressLint("SetTextI18n")
+    public boolean checkDataInit(){
+        SharedPreferences sharedPreferences = getSharedPreferences(Constant.WECHAT_STORAGE, Activity.MODE_MULTI_PROCESS);  //创建储存读取
+        String token = sharedPreferences.getString("token", null);
+        if(token == null){
+            Toast.makeText(getBaseContext(), "数据为空请更新数据", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        String[] tagList = sharedPreferences.getString("tag", "").split(",");
+        // 把所有数据解析成 对象保存起来
+        ArrayList<MomentItemBean> dataList = new ArrayList<>();
+        for (int i = 0; i< tagList.length; i++){
+            String tagStringData = sharedPreferences.getString(tagList[i], "");
+            ArrayList<MomentItemBean> tagListObject = RequestUrlData.dataStringToJsonObject(tagStringData);
+            dataList.addAll(tagListObject);
+        }
+        allMsg = dataList;
+
+        // 给界面赋值
+        edit.setText(allMsg.get(0).getTilte());
+        editIndex.setText(sharedPreferences.getString("index", "0"));
+
+        // 统计数字到界面
+        int msgLength = dataList.size();
+        msgCount.setText("总共条数：" + String.valueOf(msgLength));
+        msgResidue.setText("剩余: " + String.valueOf(msgLength));
+
+        //添加图片控件进数组
         ids = new ArrayList<>();
         ids.add(R.id.img1);
         ids.add(R.id.img2);
@@ -68,57 +149,17 @@ public class MainActivity extends AppCompatActivity {
         ids.add(R.id.img8);
         ids.add(R.id.img9);
 
-        urls = new ArrayList<>();
-        urls.add("https://xcimg.szwego.com/1535773806_2579627491_0?imageView2/2/format/jpg");
-        urls.add("https://xcimg.szwego.com/1535773807_958498888_1?imageView2/2/format/jpg");
-        urls.add("https://xcimg.szwego.com/1535773807_3749844693_2?imageView2/2/format/jpg");
-        urls.add("https://xcimg.szwego.com/1535773807_1926767108_3?imageView2/2/format/jpg");
-        urls.add("https://xcimg.szwego.com/1535773807_1084069846_4?imageView2/2/format/jpg");
-        urls.add("https://xcimg.szwego.com/1535773807_2656625861_5?imageView2/2/format/jpg");
-        urls.add("https://xcimg.szwego.com/1535773807_1002556768_6?imageView2/2/format/jpg");
-        urls.add("https://xcimg.szwego.com/1535773807_120051631_7?imageView2/2/format/jpg");
-
-        for (int i = 0; i < urls.size(); i++){
-            Glide.with(this).load(urls.get(i)).into((ImageView) findViewById(ids.get(i)));
-        }
-
-    }
-
-    View.OnClickListener clickListener = new View.OnClickListener() {
-        @Override
-        public void onClick(View v) {
-            switch (v.getId()) {
-                case R.id.open_accessibility_setting:
-                    OpenAccessibilitySettingHelper.jumpToSettingPage(getBaseContext());
-                    break;
-                case R.id.btn_save:
-                    saveData();
-                    break;
-                case R.id.btn_paues:
-                    pauseSendStatus();
-                    break;
-            }
-        }
-    };
-
-    public boolean checkParams() {
-        if (TextUtils.isEmpty(editIndex.getText().toString())) {
-            Toast.makeText(getBaseContext(), "起始下标不能为空", Toast.LENGTH_SHORT).show();
-            return false;
-        }
-
-        if (TextUtils.isEmpty(editCount.getText().toString())) {
-            Toast.makeText(getBaseContext(), "图片总数不能为空", Toast.LENGTH_SHORT).show();
-            return false;
-        }
-
-        if (Integer.valueOf(editCount.getText().toString()) > 9) {
-            Toast.makeText(getBaseContext(), "图片总数不能超过9张", Toast.LENGTH_SHORT).show();
-            return false;
-        }
-
+        imgUrls = allMsg.get(0).getUrls();
+        glideImgs(); //渲染图片到界面
         return true;
     }
+
+    public void glideImgs(){
+        for (int i = 0; i < imgUrls.length; i++){
+            Glide.with(this).load(imgUrls[i]).into((ImageView) findViewById(ids.get(i)));
+        }
+    }
+
 
     private void pauseSendStatus(){
         SharedPreferences sharedPreferences = getSharedPreferences(Constant.WECHAT_STORAGE, Activity.MODE_MULTI_PROCESS);
@@ -130,18 +171,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveData() {
-        if (!checkParams()) {
+        if (!checkDataInit()) {
             return;
         }
 
-        int index = Integer.valueOf(editIndex.getText().toString());
-        int count = Integer.valueOf(editCount.getText().toString());
 
         SharedPreferences sharedPreferences = getSharedPreferences(Constant.WECHAT_STORAGE, Activity.MODE_MULTI_PROCESS);
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putString(Constant.CONTENT, edit.getText().toString());
-        editor.putInt(Constant.INDEX, index);
-        editor.putInt(Constant.COUNT, count);
         editor.putBoolean(Constant.STATUS, false);
         if (editor.commit()) {
             Toast.makeText(getBaseContext(), "保存成功", Toast.LENGTH_LONG).show();

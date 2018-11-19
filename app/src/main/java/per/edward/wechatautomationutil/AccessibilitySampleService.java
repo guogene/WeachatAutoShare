@@ -28,7 +28,7 @@ public class AccessibilitySampleService extends AccessibilityService {
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
-        flag = false;
+        flag = true;
     }
 
     private AccessibilityNodeInfo accessibilityNodeInfo;
@@ -36,7 +36,7 @@ public class AccessibilitySampleService extends AccessibilityService {
     /**
      * 是否已经发送过朋友圈，true已经发送，false还未发送
      */
-    public static boolean flag = false;
+    public static boolean flag = true;
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
