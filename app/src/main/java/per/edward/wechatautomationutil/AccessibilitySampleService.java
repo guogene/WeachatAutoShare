@@ -41,6 +41,7 @@ public class AccessibilitySampleService extends AccessibilityService {
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
         final SharedPreferences sharedPreferences = getSharedPreferences(Constant.WECHAT_STORAGE, Activity.MODE_MULTI_PROCESS);
+        flag = sharedPreferences.getBoolean(Constant.STATUS, true); // 读取预设服务状态.
         int eventType = event.getEventType();
         LogUtil.e(eventType + "             " + Integer.toHexString(eventType) + "         " + event.getClassName());
         accessibilityNodeInfo = getRootInActiveWindow();
