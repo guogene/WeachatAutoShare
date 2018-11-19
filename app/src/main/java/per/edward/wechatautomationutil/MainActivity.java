@@ -145,6 +145,13 @@ public class MainActivity extends AppCompatActivity {
         editor.putBoolean(Constant.STATUS, false);
         if (editor.commit()) {
             Toast.makeText(getBaseContext(), "保存成功", Toast.LENGTH_LONG).show();
+            AccessibilitySampleService.flag = false;
+            if (AccessibilitySampleService.flag){
+                LogUtil.e("flag = true");
+            }else {
+                LogUtil.e("flag = false");
+            }
+
             openWeChatApplication();//打开微信应用
         } else {
             Toast.makeText(getBaseContext(), "保存失败", Toast.LENGTH_LONG).show();
