@@ -1,23 +1,27 @@
 package per.edward.wechatautomationutil;
 
-import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.os.Handler;
+import android.os.Message;
+import android.os.StrictMode;
+import android.os.SystemClock;
+import android.support.annotation.MainThread;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.text.Editable;
-import android.text.TextUtils;
-import android.util.Log;
 import android.view.View;
+import android.view.Window;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ImageView;
 import com.bumptech.glide.Glide;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 
 import per.edward.wechatautomationutil.datainitialize.MomentItemBean;
@@ -31,19 +35,24 @@ import per.edward.wechatautomationutil.datainitialize.RequestUrlData;
  * 1、Android设备必须安装微信app
  * 2、Android Sdk Version
  * <p>
- * Created by Edward on 2018-03-15.
+ * Created by Edward on 2018-11-20.
  */
 public class MainActivity extends AppCompatActivity {
     EditText edit, editIndex, editToken, editTag;
     TextView msgCount, msgResidue;
+    static ProgressBar progressBar;
     private ArrayList<MomentItemBean> allMsg;
     private String[] imgUrls;
     private ArrayList<Integer> ids;
+    private MyHandler mHandler;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+//        StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder().detectDiskReads().detectDiskWrites().detectNetwork().penaltyLog().build());
+//        StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder().detectLeakedSqlLiteObjects().detectLeakedClosableObjects().penaltyLog().penaltyDeath().build());
+        mHandler = new MyHandler(this);
         initView();
     }
 
@@ -52,6 +61,9 @@ public class MainActivity extends AppCompatActivity {
         editIndex = findViewById(R.id.edit_index);
         editToken = findViewById(R.id.edit_token);
         editTag = findViewById(R.id.edit_tag);
+        msgCount = findViewById(R.id.msg_count);
+        msgResidue = findViewById(R.id.msg_residue);
+        progressBar = findViewById(R.id.progressBar);
 
         findViewById(R.id.open_accessibility_setting).setOnClickListener(clickListener);
         findViewById(R.id.btn_send).setOnClickListener(clickListener);
@@ -75,17 +87,26 @@ public class MainActivity extends AppCompatActivity {
                     pauseSendStatus();
                     break;
                 case R.id.btn_update:
-                    try {
-                        updateData();
-                        Toast.makeText(getBaseContext(), "更新数据成功", Toast.LENGTH_SHORT).show();
-                    } catch (IOException e) {
-                        Toast.makeText(getBaseContext(), "更新数据失败", Toast.LENGTH_SHORT).show();
-                        e.printStackTrace();
-                    }
+                    progressBar.setVisibility(View.VISIBLE);  //显示加载框
+                    updateDataThread.start();  //开启更新数据请求线程
+                    checkDataInit();
                     break;
             }
         }
     };
+
+    Thread updateDataThread = new Thread(new Runnable() {
+        @Override
+        public void run() {
+            try {
+                updateData();
+                mHandler.sendEmptyMessage(0);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    });
+
 
     public void updateData() throws IOException {
         SharedPreferences sharedPreferences = getSharedPreferences(Constant.WECHAT_STORAGE, Activity.MODE_MULTI_PROCESS);  //创建储存读取
@@ -104,12 +125,10 @@ public class MainActivity extends AppCompatActivity {
             editor.putString(tagList[i], tagData);
         }
         if(editor.commit()){
-            checkDataInit();
             return;
         }
     }
 
-    @SuppressLint("SetTextI18n")
     public boolean checkDataInit(){
         SharedPreferences sharedPreferences = getSharedPreferences(Constant.WECHAT_STORAGE, Activity.MODE_MULTI_PROCESS);  //创建储存读取
         String token = sharedPreferences.getString("token", null);
@@ -127,15 +146,16 @@ public class MainActivity extends AppCompatActivity {
             dataList.addAll(tagListObject);
         }
         allMsg = dataList;
-
         // 给界面赋值
         edit.setText(allMsg.get(0).getTilte());
         editIndex.setText(sharedPreferences.getString("index", "0"));
 
         // 统计数字到界面
         int msgLength = dataList.size();
-        msgCount.setText("总共条数：" + String.valueOf(msgLength));
-        msgResidue.setText("剩余: " + String.valueOf(msgLength));
+        String updateMsgCount = "总共条数: " + String.valueOf(msgLength);
+        String updateMsgResidue = "剩余: " + String.valueOf(msgLength);
+        msgCount.setText(updateMsgCount);
+        msgResidue.setText(updateMsgResidue);
 
         //添加图片控件进数组
         ids = new ArrayList<>();
@@ -200,4 +220,31 @@ public class MainActivity extends AppCompatActivity {
         Intent it = packageManager.getLaunchIntentForPackage("com.tencent.mm");
         startActivity(it);
     }
+
+    @Override
+    protected void onDestroy() {
+        // Remove all Runnable and Message.
+        mHandler.removeCallbacksAndMessages(null);
+
+        super.onDestroy();
+    }
+
+    static class MyHandler extends Handler {
+        // WeakReference to the outer class's instance.
+        private WeakReference<MainActivity> mOuter;
+
+        public MyHandler(MainActivity activity) {
+            mOuter = new WeakReference<MainActivity>(activity);
+        }
+
+        @Override
+        public void handleMessage(Message msg) {
+            MainActivity outer = mOuter.get();
+            if (outer != null) {
+                // Do something with outer as your wish.
+                progressBar.setVisibility(View.GONE);
+            }
+        }
+    }
+
 }

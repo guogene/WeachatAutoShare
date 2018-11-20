@@ -16,6 +16,13 @@
             android:layout_marginTop="20dp"
             android:text="打开辅助功能开关" />
 
+        <ProgressBar
+            android:id="@+id/progressBar"
+            style="?android:attr/progressBarStyle"
+            android:layout_width="match_parent"
+            android:visibility="gone"
+            android:layout_height="133dp" />
+
         <EditText
             android:id="@+id/edit"
             android:layout_width="match_parent"
