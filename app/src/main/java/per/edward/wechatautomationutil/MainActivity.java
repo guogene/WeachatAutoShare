@@ -4,15 +4,13 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Message;
-import android.os.StrictMode;
-import android.os.SystemClock;
-import android.support.annotation.MainThread;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
-import android.view.Window;
 import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -23,7 +21,9 @@ import com.bumptech.glide.Glide;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Arrays;
 
+import per.edward.wechatautomationutil.datainitialize.DownloadImg;
 import per.edward.wechatautomationutil.datainitialize.MomentItemBean;
 import per.edward.wechatautomationutil.utils.Constant;
 import per.edward.wechatautomationutil.utils.LogUtil;
@@ -41,19 +41,24 @@ public class MainActivity extends AppCompatActivity {
     EditText edit, editIndex, editToken, editTag;
     TextView msgCount, msgResidue;
     static ProgressBar progressBar;
+
     private ArrayList<MomentItemBean> allMsg;
     private String[] imgUrls;
     private ArrayList<Integer> ids;
     private MyHandler mHandler;
+    private String tag = "test";
+    private ArrayList<Uri> imgUri;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-//        StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder().detectDiskReads().detectDiskWrites().detectNetwork().penaltyLog().build());
-//        StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder().detectLeakedSqlLiteObjects().detectLeakedClosableObjects().penaltyLog().penaltyDeath().build());
         mHandler = new MyHandler(this);
         initView();
+        String[] urlSet = allMsg.get(100).getUrls();
+        ArrayList<String> urlList = new ArrayList<String>(Arrays.asList(urlSet));
+        ArrayList<Uri> imgUri = DownloadImg.permissonDownload(this, urlList);
++
     }
 
     private void initView() {
@@ -88,14 +93,14 @@ public class MainActivity extends AppCompatActivity {
                     break;
                 case R.id.btn_update:
                     progressBar.setVisibility(View.VISIBLE);  //显示加载框
-                    updateDataThread.start();  //开启更新数据请求线程
+                    new Thread(new updateDataThread()).start();  //开启更新数据请求线程
                     checkDataInit();
                     break;
             }
         }
     };
 
-    Thread updateDataThread = new Thread(new Runnable() {
+    private class updateDataThread implements Runnable{
         @Override
         public void run() {
             try {
@@ -105,7 +110,7 @@ public class MainActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
         }
-    });
+    }
 
 
     public void updateData() throws IOException {
