@@ -3,7 +3,7 @@ apply plugin: 'com.android.application'
 android {
     compileSdkVersion 27
     defaultConfig {
-        applicationId "per.edward.wechatautomationutil"
+        applicationId "com.gene.guo.quanautoshare"
         minSdkVersion 21
         targetSdkVersion 27
         versionCode 1
@@ -26,6 +26,4 @@ dependencies {
     implementation 'com.zhy:okhttputils:2.6.2'
     implementation 'com.github.bumptech.glide:glide:4.7.1'
     implementation 'com.alibaba:fastjson:1.1.70.android'
-
 }
-
