@@ -15,6 +15,17 @@ public class Constant {
 
     public static final String CONTENT = "content";
 
-    public static final String STATUS = "status";
+    public static final String STATUS = "servicesStatus";
+
+    public static final String MSGSUM = "messageSum";
+
+    public static final String SENDING = "sending";
+
+    public static final String SENT = "sent";
+
+    public static final String LASTEST_IMG_PATH = "lasestImgPath";
+
+    //微信的节点
+    public static final String PASTE_TEXT ="com.tencent.mm:id/cib";
 
 }

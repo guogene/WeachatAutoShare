@@ -1,13 +1,22 @@
 package per.edward.wechatautomationutil.datainitialize;
 
 import android.Manifest;
+import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.Context;
+import android.content.CursorLoader;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Environment;
 import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.yanzhenjie.permission.Action;
 import com.yanzhenjie.permission.AndPermission;
@@ -15,13 +24,15 @@ import com.zhy.http.okhttp.OkHttpUtils;
 import com.zhy.http.okhttp.callback.FileCallBack;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.net.URI;
-import java.net.URISyntaxException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import okhttp3.Call;
+import per.edward.wechatautomationutil.utils.Constant;
 
 public class DownloadImg {
     private static int needDownloadSize = 0;
@@ -81,11 +92,20 @@ public class DownloadImg {
                     @Override
                     public void onResponse(File response, int id) {
                         if (response != null){
-                            Uri mUri;
+                            Uri mUri = null;
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N){
-                                mUri = Uri.parse(insertImageToSystem(context, response.getAbsolutePath()));
+//                                mUri = Uri.parse(insertImageToSystem(context, response.getAbsolutePath()));
+                                try {
+                                    mUri = insertSystemGallery(context, response.getAbsolutePath(), String.valueOf(index));
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
                             }else {
-                                mUri = Uri.parse(insertImageToSystem(context, response.getAbsolutePath()));
+                                try {
+                                    mUri = insertSystemGallery(context, response.getAbsolutePath(), String.valueOf(index));
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
                             }
                             try {
                                 uriList.set(index, mUri);
@@ -97,16 +117,51 @@ public class DownloadImg {
                 });
     }
 
-    private static String insertImageToSystem(Context context, String imagePath) {
-        String url = "";
-        try {
-            if (context != null){
-                url = MediaStore.Images.Media.insertImage(context.getContentResolver(), imagePath, PIC_NAME, "描述");
-            }
-        }catch (FileNotFoundException e){
-            e.printStackTrace();
+//    private static String insertImageToSystem(Context context, String imagePath) {
+//        String url = "";
+//        try {
+//            if (context != null){
+//                url = MediaStore.Images.Media.insertImage(context.getContentResolver(), imagePath, PIC_NAME, "描述");
+//            }
+//        }catch (FileNotFoundException e){
+//            e.printStackTrace();
+//        }
+//        return url;
+//    }
+
+    private static Uri insertSystemGallery(Context context, String imagePath, String picName) throws IOException {
+        //生成BITMAP
+        FileInputStream fis = new FileInputStream(imagePath);
+        Bitmap bitmap  = BitmapFactory.decodeStream(fis);
+
+        String fileName = null;
+        String galleryPath= Environment.getExternalStorageDirectory()
+                + File.separator + Environment.DIRECTORY_DCIM
+                +File.separator +"shoes";
+        File fileDir = new File(galleryPath);
+        if (!fileDir.exists()){
+            fileDir.mkdirs();
         }
-        return url;
+        File file = null;
+        // 声明输出流
+        FileOutputStream outStream = null;
+        file = new File(galleryPath + File.separator, picName+ ".jpg");
+        // 获得文件相对路径
+        fileName = file.toString();
+        // 获得输出流，如果文件中有内容，追加内容
+        outStream = new FileOutputStream(fileName);
+        if (null != outStream) {
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outStream);
+        }
+        if (outStream != null) {
+            outStream.close();
+        }
+        Intent intent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+        Uri uri = Uri.fromFile(file);
+        intent.setData(uri);
+        context.sendBroadcast(intent);
+
+        return uri;
     }
 
     private static void initImgUrl(ArrayList<String> imgUrls) {
@@ -118,22 +173,80 @@ public class DownloadImg {
         downloadedSize = 0;
     }
 
-    public static boolean deleteFile() throws URISyntaxException {
-        for (int i = 0; i < uriList.size(); i++) {
-            URI fileName = new URI(uriList.get(i).toString());
-            File file = new File(fileName);
-            // 如果文件路径所对应的文件存在，并且是一个文件，则直接删除
-            if (file.exists() && file.isFile()) {
-                if (file.delete()) {
-                }
+    /** 删除单个文件
+     * @param filePath$Name 要删除的文件的文件名
+     * @return 单个文件删除成功返回true，否则返回false
+     */
+    private static boolean deleteSingleFile(Context context, String filePath$Name) {
+        File file = new File(filePath$Name);
+        // 如果文件路径所对应的文件存在，并且是一个文件，则直接删除
+        if (file.exists() && file.isFile()) {
+            if (file.delete()) {
+                Log.e("--Method--", "Copy_Delete.deleteSingleFile: 删除单个文件" + filePath$Name + "成功！");
+                return true;
+            } else {
+                Toast.makeText(context, "删除单个文件" + filePath$Name + "失败！", Toast.LENGTH_SHORT).show();
+                return false;
+            }
+        } else {
+            Toast.makeText(context, "删除单个文件失败：" + filePath$Name + "不存在！", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+    }
+
+    public static void deleteFile(Context context){
+        String filePath = Environment.getExternalStorageDirectory()
+                + File.separator + Environment.DIRECTORY_DCIM
+                + File.separator + "shoes" + File.separator;
+        File dirFile = new File(filePath);
+
+        boolean flag = true;
+        // 删除文件夹中的所有文件包括子目录
+        File[] files = dirFile.listFiles();
+        for (File file : files) {
+            // 删除子文件
+            if (file.isFile()) {
+                flag = deleteSingleFile(context, file.getAbsolutePath());
+                if (!flag)
+                    break;
             }
         }
-        return true;
+        if (!flag) {
+            Toast.makeText(context, "删除目录失败！", Toast.LENGTH_SHORT).show();
+
+        }
     };
+
+    /**
+     * 查询一个URI 的绝对路径
+     * @param contentUri
+     * @param context
+     * @return
+     */
+    private static String getRealPathFromURI(Uri contentUri, Context context) {
+        String[] proj = { MediaStore.Images.Media.DATA };
+        CursorLoader loader = new CursorLoader(context, contentUri, proj, null, null, null);
+        Cursor cursor = loader.loadInBackground();
+        int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+        cursor.moveToFirst();
+        String dataPath = cursor.getString(column_index);
+        cursor.close();
+        return dataPath;
+    }
 
     private static void checkDownload(Context context) {
         if (downloadedSize >= needDownloadSize){
             progressDialog.dismiss();
+            StringBuilder imgUrlPath = new StringBuilder();
+            for (int i = 0; i < uriList.size(); i++) {
+                imgUrlPath.append(",").append(uriList.get(i).toString());
+            }
+            String imgPathStr = imgUrlPath.toString();
+            SharedPreferences sharedPreferences = context.getSharedPreferences(Constant.WECHAT_STORAGE, Activity.MODE_MULTI_PROCESS);  //调用存储,保存当前图片地址
+            SharedPreferences.Editor editor = sharedPreferences.edit();
+            editor.putString(Constant.LASTEST_IMG_PATH, imgPathStr);
+            editor.apply();
+
         }
     }
 }

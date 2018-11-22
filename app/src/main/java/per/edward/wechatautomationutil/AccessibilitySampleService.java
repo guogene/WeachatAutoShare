@@ -8,10 +8,13 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.widget.Toast;
 
 import java.util.List;
 
@@ -40,22 +43,25 @@ public class AccessibilitySampleService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        final SharedPreferences sharedPreferences = getSharedPreferences(Constant.WECHAT_STORAGE, Activity.MODE_MULTI_PROCESS);
+        SharedPreferences sharedPreferences = getSharedPreferences(Constant.WECHAT_STORAGE, Activity.MODE_MULTI_PROCESS);
         flag = sharedPreferences.getBoolean(Constant.STATUS, true); // 读取预设服务状态.
         int eventType = event.getEventType();
-        LogUtil.e(eventType + "             " + Integer.toHexString(eventType) + "         " + event.getClassName());
+//        LogUtil.e(eventType + "             " + Integer.toHexString(eventType) + "         " + event.getClassName());
         accessibilityNodeInfo = getRootInActiveWindow();
-        switch (eventType) {
-            case AccessibilityEvent.TYPE_VIEW_SCROLLED:
-                if (!flag && event.getClassName().equals("android.widget.ListView")) {
-                    clickCircleOfFriendsBtn();//点击发送朋友圈按钮
-                }
 
-                break;
+        if (!flag && event.getClassName().equals("android.widget.ListView")) {
+            clickCircleOfFriendsBtn();//点击发送朋友圈按钮
+        }
+
+        switch (eventType) {
+
+//            case AccessibilityEvent.TYPE_VIEW_SCROLLED:
+//
+//
+//                break;
             case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED:
 
-                if (event.getClassName().equals("com.tencent.mm.ui.LauncherUI")) {//第一次启动app
-                    flag = false;
+                if (!flag && event.getClassName().equals("com.tencent.mm.ui.LauncherUI")) {//第一次启动app
                     jumpToCircleOfFriends();//进入朋友圈页面
                 }
 
@@ -68,9 +74,10 @@ public class AccessibilitySampleService extends AccessibilityService {
                     new Handler().postDelayed(new Runnable() {
                         @Override
                         public void run() {
-                            if (sharedPreferences != null) {
-                                int index = sharedPreferences.getInt(Constant.INDEX, 0);
-                                int count = sharedPreferences.getInt(Constant.COUNT, 0);
+                            SharedPreferences getSharedCount = getSharedPreferences(Constant.WECHAT_STORAGE, Activity.MODE_MULTI_PROCESS);
+                            if (getSharedCount != null) {
+                                int index = getSharedCount.getInt(Constant.INDEX, 0);
+                                int count = getSharedCount.getInt(Constant.COUNT, 8);
                                 choosePicture(index, count);
                             }
                         }
@@ -104,7 +111,7 @@ public class AccessibilitySampleService extends AccessibilityService {
      */
     private void jumpBackApp(){
         Intent intent = new Intent();
-        intent.setClassName("per.edward.wechatautomationutil","per.edward.wechatautomationutil.MainActivity");
+        intent.setClassName(getPackageName(), getPackageName() + ".MainActivity");
         startActivity(intent);
     }
 
@@ -128,16 +135,29 @@ public class AccessibilitySampleService extends AccessibilityService {
             clipboard.setPrimaryClip(clip);
             tempInfo.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
             tempInfo.performAction(AccessibilityNodeInfo.ACTION_PASTE);
+
             return true;
+        }else{
+            Bundle arguments = new Bundle();
+            arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, contentStr);
+            tempInfo.performAction(AccessibilityNodeInfo.FOCUS_INPUT);
+            tempInfo.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
         }
         return false;
     }
 
-    private boolean sendMsg() {
+    private boolean sendMsg(){
         List<AccessibilityNodeInfo> list = accessibilityNodeInfo.findAccessibilityNodeInfosByText("发表");//微信6.6.6版本修改为发表
         if (performClickBtn(list)) {
-            flag = true;//标记为已发送
-            jumpBackApp(); //跳回原APP
+            // 变更已发送 位置
+            SharedPreferences sharedPreferences = getSharedPreferences(Constant.WECHAT_STORAGE, Activity.MODE_MULTI_PROCESS);
+            SharedPreferences.Editor editor = sharedPreferences.edit();
+            int sending = sharedPreferences.getInt(Constant.SENDING, 1);
+            editor.putInt(Constant.SENT, sending);
+            editor.putBoolean(Constant.STATUS, true);
+            if (editor.commit()){
+                Toast.makeText(getBaseContext(), "10秒后发送下一条   当前发送到第 " + sending + "条", Toast.LENGTH_SHORT).show();
+            }
             return true;
         }
         return false;
@@ -156,6 +176,8 @@ public class AccessibilitySampleService extends AccessibilityService {
                     return;
                 }
                 List<AccessibilityNodeInfo> nodeInfoList = accessibilityNodeInfo.findAccessibilityNodeInfosByText("添加照片按钮");
+                List<AccessibilityNodeInfo> nodeInfoTextList = accessibilityNodeInfo.findAccessibilityNodeInfosByViewId(Constant.PASTE_TEXT);
+                AccessibilityNodeInfo tempInfo;
                 if (nodeInfoList == null ||
                         nodeInfoList.size() == 0 ||
                         nodeInfoList.get(0) == null ||
@@ -163,11 +185,12 @@ public class AccessibilitySampleService extends AccessibilityService {
                         nodeInfoList.get(0).getParent().getParent() == null ||
                         nodeInfoList.get(0).getParent().getParent().getParent() == null ||
                         nodeInfoList.get(0).getParent().getParent().getParent().getChildCount() == 0) {
-                    return;
+                    tempInfo = nodeInfoTextList.get(0);
+                }else {
+                    tempInfo = nodeInfoList.get(0).getParent().getParent().getParent().getChild(1);//微信6.6.6
                 }
-                AccessibilityNodeInfo tempInfo = nodeInfoList.get(0).getParent().getParent().getParent().getChild(1);//微信6.6.6
                 if (pasteContent(tempInfo, contentStr)) {
-                    sendMsg();
+                        sendMsg();
                 }
             }
         }, TEMP);
@@ -199,6 +222,8 @@ public class AccessibilitySampleService extends AccessibilityService {
      * @param picCount      总共选picCount张
      */
     private void choosePicture(final int startPicIndex, final int picCount) {
+        Toast.makeText(getBaseContext(), "开始" + startPicIndex + "总共: "+picCount, Toast.LENGTH_SHORT).show();
+
         new Handler().postDelayed(new Runnable() {
             @Override
             public void run() {
